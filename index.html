@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
     
     <style>
-        :root { --primary: #2d98da; --accent: #fc5c65; --bg: #f1f2f6; --card-bg: #ffffff; --text: #2f3542; }
+        :root { --primary: #2d98da; --accent: #ff4757; --bg: #f1f2f6; --card-bg: #ffffff; --text: #2f3542; }
         body { font-family: 'Noto Sans TC', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; min-height: 100vh; }
         .container { background: var(--card-bg); width: 100%; max-width: 650px; padding: 2rem; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); position: relative; }
 
@@ -34,36 +34,78 @@
         
         #status { text-align: center; margin-top: 15px; color: #747d8c; min-height: 20px; }
         
-        /* --- 卡片式排版設計 (解決手機表格難讀問題) --- */
+        /* --- 全新卡片設計 (解決文字擁擠問題) --- */
         .result-card {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 1.5rem;
+            background: #ffffff;
+            border: 1px solid #e1e1e1;
+            border-radius: 16px;
+            padding: 1.2rem;
             margin-bottom: 1.2rem;
-            border-left: 5px solid var(--primary);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
-        .result-card h3 { margin-top: 0; color: #2d98da; border-bottom: 1px solid #eee; padding-bottom: 8px; font-size: 1.2rem; }
-        .result-card ul { padding-left: 20px; margin-bottom: 10px; }
-        .result-card li { margin-bottom: 6px; line-height: 1.6; }
-        
-        /* 導航按鈕樣式 */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 8px;
+            margin-bottom: 4px;
+        }
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2d98da;
+            margin: 0;
+        }
+        .card-price {
+            background: #f1f2f6;
+            color: #57606f;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .card-location {
+            color: #ff6b6b; /* 強調位置顏色 */
+            font-weight: bold;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .card-desc {
+            color: #57606f;
+            font-size: 0.95rem;
+            line-height: 1.6; /* 增加行距，解決擁擠 */
+            margin: 0;
+        }
         .map-btn {
-            display: inline-block;
             background-color: #27ae60;
             color: white;
             text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
+            padding: 10px;
+            border-radius: 12px;
+            font-size: 1rem;
             font-weight: bold;
-            margin-top: 10px;
-            width: fit-content;
+            text-align: center;
+            margin-top: 8px;
+            display: block;
+            transition: background 0.2s;
         }
         .map-btn:hover { background-color: #219150; }
-
-        /* 讓 Markdown 解析後的元素符合卡片樣式 */
-        #result h3 { color: #2d98da; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-top: 1.5rem; }
+        
+        .guide-tip {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-top: 20px;
+            border-left: 5px solid #ffeeba;
+        }
     </style>
 </head>
 <body>
@@ -76,6 +118,9 @@
         <label>請輸入 Gemini API Key 🔑</label>
         <input type="password" id="apiKeyInput" placeholder="貼上 Key (暫存於此分頁)">
         <button onclick="saveKey()">確認並開始使用</button>
+        <div style="margin-top:10px; font-size:0.8rem; color:#aaa; text-align:center;">
+            (Key 僅暫存於此分頁，不會上傳伺服器)
+        </div>
     </div>
 
     <div id="searchSection" class="section">
@@ -94,14 +139,11 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
     window.onload = function() { checkSession(); };
     const apiKeyInput = document.getElementById('apiKeyInput');
     const locationInput = document.getElementById('locationInput');
     const queryInput = document.getElementById('queryInput');
-
-    // 注意：已移除 Enter 鍵監聽
 
     function checkSession() {
         if (sessionStorage.getItem('geminiKey')) showSearchUI();
@@ -145,56 +187,86 @@
 
         resultDiv.innerHTML = '';
         btn.disabled = true;
-        statusDiv.innerHTML = '🧭 正在模擬 Google Maps 搜尋邏輯...';
+        statusDiv.innerHTML = '🧭 正在掃描周邊 (半徑 500公尺內)...';
 
         try {
             // 指定使用 gemini-2.5-flash
             const modelName = 'gemini-2.5-flash';
             
-            statusDiv.innerHTML = `✅ 連線成功 (使用模型: ${modelName})<br>🔍 正在為您篩選最佳去處...`;
-
-            // 手機版面優化 Prompt
+            // 使用 JSON Schema 讓 AI 回傳乾淨的數據，不要回傳亂七八糟的文字
             const prompt = `
-                你是一位講話實在、非常熟悉法國的在地導遊。使用者目前位於「${location}」。
-                他想要尋找附近的「${query}」。
+                你是一位講話實在的法國在地導遊。使用者位於「${location}」，想找附近的「${query}」。
+
+                請嚴格遵守以下規則：
+                1. **距離限制**：只能推薦 **真正位於附近 (步行距離 < 500公尺)** 的地點。如果該區域沒有相關地點，請直接回傳空清單，不要硬湊遠處的景點。
+                2. **禁止瞎掰時間**：不要寫 "走路 10 分鐘"，請改用相對位置描述，例如 "在xx博物館後方" 或 "位於xx路口"。
+                3. **JSON 格式**：請回傳一個 JSON 陣列 (Array)，不要包含任何 Markdown 標記 (如 \`\`\`json)。
                 
-                重要指令：
-                1. **準確性優先**：請模擬 Google Maps 或 Tripadvisor 的搜尋結果。嚴禁捏造不存在的店。如果該地點附近真的沒有使用者要找的東西（例如在住宅區找百貨公司），請老實告知。
-                2. **手機版面優化**：不要使用表格 (Table)，請使用「卡片式」的條列格式。
-                3. **連結有效性**：地圖連結請使用 Google 搜尋語法，不要自己產生座標連結。
-                
-                請推薦 3 到 5 個最佳選擇，每個選擇請依照以下 Markdown 格式輸出（請嚴格遵守）：
+                JSON 結構範例：
+                [
+                    {
+                        "name": "店名",
+                        "location_hint": "位於郵局旁邊 (精簡描述)",
+                        "description": "特色說明，必點推薦，約50字以內",
+                        "price": "€€",
+                        "search_query": "店名 + 城市"
+                    }
+                ]
 
-                <div class="result-card">
-                ### 店名/景點名
-                * **距離/位置**：(例如：走路5分鐘，位於xx旁)
-                * **特色/評價**：(Tripadvisor 或 Google 評價摘要)
-                * **價格/評分**：
-                * <a href="https://www.google.com/maps/search/?api=1&query={把店名與城市拼在一起的英文名稱}" target="_blank" class="map-btn">📍 開啟地圖 / 導航</a>
-                </div>
-
-                (請重複上述區塊 3-5 次)
-
-                最後給一個簡短的 **「導遊建議」**。
+                請提供 3-5 個推薦。最後請附帶一個 "tip" 欄位提供導遊建議。
+                最終輸出格式應為： { "recommendations": [...], "tip": "導遊建議..." }
             `;
 
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseMimeType: "application/json" } // 強制 AI 吐出 JSON
+                })
             });
 
             if (!response.ok) throw new Error("API 連線失敗");
 
             const data = await response.json();
-            const text = data.candidates[0].content.parts[0].text;
+            const jsonText = data.candidates[0].content.parts[0].text;
+            const parsedData = JSON.parse(jsonText); // 解析 JSON
+
+            // 開始渲染 HTML (由程式碼控制排版，保證不跑版)
+            let htmlContent = '';
             
-            // 允許 HTML 標籤以渲染卡片 div
-            resultDiv.innerHTML = marked.parse(text);
+            if (parsedData.recommendations && parsedData.recommendations.length > 0) {
+                parsedData.recommendations.forEach(item => {
+                    // 建立 Google Maps App 連結
+                    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.search_query)}`;
+                    
+                    htmlContent += `
+                        <div class="result-card">
+                            <div class="card-header">
+                                <h3 class="card-title">${item.name}</h3>
+                                <span class="card-price">${item.price || '價格未知'}</span>
+                            </div>
+                            <div class="card-location">📍 ${item.location_hint}</div>
+                            <p class="card-desc">${item.description}</p>
+                            <a href="${mapUrl}" target="_blank" class="map-btn">🗺️ 開啟地圖 / 導航</a>
+                        </div>
+                    `;
+                });
+            } else {
+                htmlContent = `<div style="text-align:center; padding:20px;">抱歉，這附近似乎沒有符合您需求的推薦 😓</div>`;
+            }
+
+            // 加入導遊建議
+            if (parsedData.tip) {
+                htmlContent += `<div class="guide-tip">💡 <strong>導遊小撇步：</strong>${parsedData.tip}</div>`;
+            }
+            
+            resultDiv.innerHTML = htmlContent;
             statusDiv.innerHTML = '✨ 搜尋完成';
 
         } catch (error) {
-            resultDiv.innerHTML = `<span style="color:#fc5c65;">❌ 錯誤: ${error.message}</span>`;
+            console.error(error);
+            resultDiv.innerHTML = `<span style="color:#fc5c65;">❌ 發生錯誤，請稍後再試。</span>`;
             statusDiv.innerHTML = '';
         } finally {
             btn.disabled = false;
