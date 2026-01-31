@@ -17,15 +17,11 @@
 
         h2 { text-align: center; color: #1e272e; margin-bottom: 1.5rem; font-family: 'Poppins', sans-serif; }
         
-        /* --- 修正的核心：預設顯示 Login，用 JS 控制隱藏 --- */
-        #loginSection { display: block; } /* 預設顯示，防止白屏 */
-        #searchSection { display: none; } /* 預設隱藏 */
-        
-        /* 當添加 hidden class 時才隱藏 */
+        /* 介面切換控制 */
+        #loginSection { display: block; }
+        #searchSection { display: none; }
         .hidden { display: none !important; }
-        .visible { display: block !important; animation: fadeIn 0.5s; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .visible { display: block !important; }
 
         label { display: block; margin-bottom: 0.5rem; font-weight: 700; color: #57606f; }
         input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 2px solid #dfe4ea; border-radius: 12px; font-size: 1rem; margin-bottom: 1rem; box-sizing: border-box; }
@@ -41,17 +37,7 @@
         #status { text-align: center; margin-top: 15px; color: #747d8c; min-height: 20px; }
         
         /* 卡片設計 */
-        .result-card {
-            background: #ffffff;
-            border: 1px solid #e1e1e1;
-            border-radius: 16px;
-            padding: 1.2rem;
-            margin-bottom: 1.2rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
+        .result-card { background: #ffffff; border: 1px solid #e1e1e1; border-radius: 16px; padding: 1.2rem; margin-bottom: 1.2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px; }
         .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; margin-bottom: 4px; }
         .card-title { font-size: 1.2rem; font-weight: bold; color: #2d98da; margin: 0; flex: 1; }
         .card-price { background: #f1f2f6; color: #57606f; padding: 4px 8px; border-radius: 8px; font-size: 0.9rem; font-weight: bold; white-space: nowrap; margin-left: 10px; }
@@ -61,9 +47,6 @@
         .map-btn:hover { background-color: #1eb163; transform: translateY(-2px); box-shadow: 0 6px 10px rgba(32, 191, 107, 0.3); }
         .guide-tip { background-color: #fff3cd; color: #856404; padding: 1rem; border-radius: 12px; margin-top: 20px; border-left: 5px solid #ffeeba; line-height: 1.6; }
         .error-msg { color: #fc5c65; background: #ffeaa7; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #fdcb6e; }
-        
-        /* 載入失敗時的保險顯示 */
-        #js-error-hint { color: red; text-align: center; display: none; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -71,8 +54,6 @@
 <div class="container">
     <div class="nav-header"><a href="restaurant.html" class="nav-link">🍽️ 切換至餐廳評鑑 →</a></div>
     <h2>🇫🇷 法國旅遊萬事通</h2>
-    
-    <noscript><div style="color:red; text-align:center; padding:10px;">⚠️ 請開啟 JavaScript 以使用此網頁</div></noscript>
     
     <div id="loginSection">
         <label>請輸入 Gemini API Key 🔑</label>
@@ -100,22 +81,26 @@
 </div>
 
 <script>
-    // 確保 DOM 載入後執行
+    // 定義全域變數
+    let apiKeyInput, locationInput, queryInput, loginSec, searchSec;
+
+    // 網頁載入完成後初始化
     document.addEventListener('DOMContentLoaded', function() {
+        apiKeyInput = document.getElementById('apiKeyInput');
+        locationInput = document.getElementById('locationInput');
+        queryInput = document.getElementById('queryInput');
+        loginSec = document.getElementById('loginSection');
+        searchSec = document.getElementById('searchSection');
+        
         checkSession();
     });
 
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const locationInput = document.getElementById('locationInput');
-    const queryInput = document.getElementById('queryInput');
-    const loginSec = document.getElementById('loginSection');
-    const searchSec = document.getElementById('searchSection');
+    // --- 以下函式現在暴露在全域，按鈕一定找得到 ---
 
     function checkSession() {
         if (sessionStorage.getItem('geminiKey')) {
             showSearchUI();
         } else {
-            // 預設就是顯示 Login，所以這裡不用做什麼，但為了保險起見：
             showLoginUI();
         }
     }
@@ -130,13 +115,14 @@
     function clearKey() {
         sessionStorage.removeItem('geminiKey');
         document.getElementById('result').innerHTML = '';
+        document.getElementById('status').innerHTML = '';
         apiKeyInput.value = ''; 
         showLoginUI();
     }
 
     function showLoginUI() {
         loginSec.classList.remove('hidden');
-        loginSec.style.display = 'block'; // 強制顯示
+        loginSec.style.display = 'block';
         searchSec.classList.add('hidden');
         searchSec.style.display = 'none';
     }
@@ -145,7 +131,7 @@
         loginSec.classList.add('hidden');
         loginSec.style.display = 'none';
         searchSec.classList.remove('hidden');
-        searchSec.style.display = 'block'; // 強制顯示
+        searchSec.style.display = 'block';
     }
 
     async function startAnalysis() {
@@ -203,14 +189,14 @@
             const data = await response.json();
             let text = data.candidates[0].content.parts[0].text;
 
-            // 🧹 強力清潔：去除 Markdown 符號
+            // 清潔 JSON
             text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
             let parsedData;
             try {
                 parsedData = JSON.parse(text);
             } catch (e) {
-                console.error("JSON Parse Error:", text);
+                console.error("JSON Error:", text);
                 throw new Error("資料格式錯誤，請再試一次");
             }
 
@@ -249,4 +235,10 @@
         } catch (error) {
             resultDiv.innerHTML = `<div class="error-msg">❌ 發生錯誤: ${error.message}</div>`;
             statusDiv.innerHTML = '';
+        } finally {
+            btn.disabled = false;
         }
+    }
+</script>
+</body>
+</html>
